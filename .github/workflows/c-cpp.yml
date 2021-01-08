@@ -35,6 +35,7 @@ jobs:
             artifact_name: precompile_helper
             asset_name: precompile_helper
             arch: amd64
+            archive_ext: .tar.bz2
             suffix: -linux-amd64
           - os: ubuntu-latest
             artifact_name: precompile_helper
@@ -42,23 +43,30 @@ jobs:
             arch: i686
             suffix: -linux-i686
             make_flags: "EXTRA_FLAGS=-m32"
+            archive_ext: .tar.bz2
           - os: windows-latest
-            artifact_name: precompile_helper.exe
+            artifact_name: precompile_helper
             asset_name: precompile_helper
             arch: i686
             msystem: MINGW32
-            suffix: -win32.exe
+            suffix: -win32
+            archive_ext: .zip
+            ext: .exe
           - os: windows-latest
-            artifact_name: precompile_helper.exe
+            artifact_name: precompile_helper
             asset_name: precompile_helper
             arch: x86_64
             msystem: MINGW64
-            suffix: -win64.exe
+            suffix: -win64
+            archive_ext: .zip
+            ext: .exe
           - os: macos-latest
             artifact_name: precompile_helper
             asset_name: precompile_helper
             arch: amd64
             suffix: -mac
+            archive_ext: .tar.bz2
+
 
     steps:      
     - uses: actions/checkout@v2
@@ -77,16 +85,33 @@ jobs:
     - name: make (win)
       if: ${{matrix.os == 'windows-latest'}}
       shell: msys2 {0}
-      run:  gcc precompile_helper.c -o precompile_helper -DOS_WINDOWS
+      run:  |
+            gcc precompile_helper.c -o precompile_helper -DOS_WINDOWS
+            mkdir precompile_helper-${{env.GITHUB_REF_SLUG}}
+            cp precompile_helper.exe precompile_helper-${{env.GITHUB_REF_SLUG}}/
+            zip precompile_helper.zip precompile_helper-${{env.GITHUB_REF_SLUG}}/*
     - name: make (not win)
       if: ${{matrix.os != 'windows-latest'}}
-      run: gcc precompile_helper.c -o precompile_helper          
-    - name: Upload file
+      run: |
+           gcc precompile_helper.c -o precompile_helper
+           mkdir precompile_helper-${{env.GITHUB_REF_SLUG}}
+           cp precompile_helper precompile_helper-${{env.GITHUB_REF_SLUG}}/
+           tar -cjf precompile_helper.tar.bz2 precompile_helper-${{env.GITHUB_REF_SLUG}}
+    - name: Upload file (Binary)
       uses: actions/upload-release-asset@v1
       env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ${{matrix.artifact_name}}
-          asset_name: ${{matrix.asset_name}}-${{env.GITHUB_REF_SLUG}}${{matrix.suffix}}
+          asset_path: ${{matrix.artifact_name}}${{matrix.ext}}
+          asset_name: ${{matrix.asset_name}}-${{env.GITHUB_REF_SLUG}}${{matrix.suffix}}${{matrix.ext}}
+          asset_content_type: application/octet-stream
+    - name: Upload file (Archive)
+      uses: actions/upload-release-asset@v1
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ${{matrix.artifact_name}}${{matrix.archive_ext}}
+          asset_name: ${{matrix.asset_name}}-${{env.GITHUB_REF_SLUG}}${{matrix.suffix}}${{matrix.archive_ext}}
           asset_content_type: application/octet-stream
